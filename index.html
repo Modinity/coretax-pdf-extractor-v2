@@ -291,12 +291,21 @@ def process_pdf_content(text, filename, index):
                 if tgl_dok_match:
                     tanggal_dokumen = parse_date(tgl_dok_match.group(1).strip())
 
+        # --- B.10: PEMBAYARAN PPH INSTANSI PEMERINTAH ---
+        b10_value = ""
+        b10_match = re.search(r"B\.10.*?(?:Menggunakan|Pemerintah)\s*[:\s]*([^\n]+)", text, re.IGNORECASE)
+        if b10_match:
+            b10_value = b10_match.group(1).strip()
+            if re.match(r"^(B\.11|Nomor\s+SP2D|C\.|IDENTITAS)", b10_value, re.IGNORECASE):
+                b10_value = ""
+
         # --- B.11: NOMOR SP2D ---
         nomor_sp2d = ""
-        sp2d_match = re.search(r"(?:B\.11|Nomor\s+SP2D)\s*[:\s]*([^\n]+)", text, re.IGNORECASE)
+        sp2d_match = re.search(r"B\.11\s*(?:Nomor\s+SP2D)?\s*[:\s]*([^\n]*)", text, re.IGNORECASE)
         if sp2d_match:
             nomor_sp2d = sp2d_match.group(1).strip()
-            if re.match(r"^(C\.|IDENTITAS|NPWP)", nomor_sp2d, re.IGNORECASE):
+            nomor_sp2d = re.sub(r"^Nomor\s+SP2D\s*[:\s]*", "", nomor_sp2d, flags=re.IGNORECASE).strip()
+            if re.match(r"^(C\.|IDENTITAS|NPWP|$)", nomor_sp2d, re.IGNORECASE) or not nomor_sp2d:
                 nomor_sp2d = ""
 
         extracted_data.append({
@@ -317,7 +326,8 @@ def process_pdf_content(text, filename, index):
             "PAJAK PENGHASILAN": pph,
             "B.8 JENIS DOKUMEN": jenis_dokumen,
             "B.8 TANGGAL DOKUMEN": tanggal_dokumen,
-            "NOMOR DOKUMEN": no_dokumen,
+            "B.9 NOMOR DOKUMEN": no_dokumen,
+            "B.10 PEMBAYARAN PPH": b10_value,
             "B.11 NOMOR SP2D": nomor_sp2d,
             "C.1 NPWP / NIK": npwp,
             "C.2 NITKU": nitku,
@@ -344,7 +354,7 @@ def generate_excel():
         "KODE OBJEK PAJAK", "OBJEK PAJAK",
         "DPP", "TARIF", "PAJAK PENGHASILAN",
         "B.8 JENIS DOKUMEN", "B.8 TANGGAL DOKUMEN",
-        "NOMOR DOKUMEN", "B.11 NOMOR SP2D",
+        "B.9 NOMOR DOKUMEN", "B.10 PEMBAYARAN PPH", "B.11 NOMOR SP2D",
         "C.1 NPWP / NIK", "C.2 NITKU",
         "C.3 NAMA PEMOTONG", "C.4 TANGGAL", "C.5 NAMA PENANDATANGAN"
     ]
@@ -352,7 +362,7 @@ def generate_excel():
         if c not in df.columns:
             df[c] = ""
 
-    str_cols = ["NOMOR", "A.1 NPWP / NIK", "A.3 NITKU", "NOMOR DOKUMEN",
+    str_cols = ["NOMOR", "A.1 NPWP / NIK", "A.3 NITKU", "B.9 NOMOR DOKUMEN",
                 "C.1 NPWP / NIK", "C.2 NITKU", "B.11 NOMOR SP2D"]
     for c in str_cols:
         df[c] = df[c].astype(str)
@@ -371,9 +381,9 @@ def generate_excel():
         worksheet.set_column(14, 14, 20, num_fmt)   # PAJAK PENGHASILAN
         worksheet.set_column(5, 5, 20, text_fmt)     # A.1 NPWP
         worksheet.set_column(7, 7, 25, text_fmt)     # A.3 NITKU
-        worksheet.set_column(17, 17, 50, text_fmt)   # NOMOR DOKUMEN
-        worksheet.set_column(18, 18, 20, text_fmt)   # B.11 NOMOR SP2D
-        worksheet.set_column(19, 20, 25, text_fmt)   # C.1 NPWP / C.2 NITKU
+        worksheet.set_column(17, 17, 50, text_fmt)   # B.9 NOMOR DOKUMEN
+        worksheet.set_column(19, 19, 20, text_fmt)   # B.11 NOMOR SP2D
+        worksheet.set_column(20, 21, 25, text_fmt)   # C.1 NPWP / C.2 NITKU
 
     return base64.b64encode(buffer.getvalue()).decode()
 
