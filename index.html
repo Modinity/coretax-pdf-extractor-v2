@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Coretax PDF Extractor (V11 - Status Fix)</title>
+  <title>Coretax PDF Extractor (V12 - Full Fields)</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
 
@@ -35,7 +35,7 @@
   <div class="max-w-4xl mx-auto mt-10 p-6">
     <div class="text-center mb-8">
       <h1 class="text-3xl font-extrabold text-slate-900">Coretax PDF Extractor</h1>
-      <p class="text-sm text-slate-500 mt-2">Developed by Data Team | V11: Fix Status (NORMAL/PEMBETULAN/DIBATALKAN)</p>
+      <p class="text-sm text-slate-500 mt-2">Developed by Data Team | V12: Full Fields (A.1-A.3, B.1-B.2, B.8, B.11)</p>
     </div>
 
     <div class="bg-white rounded-xl shadow-lg border border-slate-200 p-8">
@@ -166,6 +166,23 @@ def process_pdf_content(text, filename, index):
 
         status_bupot = extract_status_bupot(header_text)
 
+        # --- 1b. SECTION A: TAXPAYER IDENTITY ---
+        a1_match = re.search(r"A\.1.*?(\d{15,16})", text, re.DOTALL)
+        a1_npwp = a1_match.group(1) if a1_match else ""
+
+        a2_match = re.search(r"A\.2.*?:\s*([^\n]+)", text)
+        a2_nama = a2_match.group(1).strip() if a2_match else ""
+
+        a3_match = re.search(r"A\.3.*?(\d{16,22})", text, re.DOTALL)
+        a3_nitku = a3_match.group(1) if a3_match else ""
+
+        # --- 1c. SECTION B: FACILITY & PPh TYPE ---
+        b1_match = re.search(r"B\.1.*?(?:Jenis\s+Fasilitas|Fasilitas)\s*[:\s]*([^\n]+)", text, re.IGNORECASE)
+        b1_fasilitas = b1_match.group(1).strip() if b1_match else ""
+
+        b2_match = re.search(r"B\.2.*?(?:Jenis\s+PPh|PPh)\s*[:\s]*([^\n]+)", text, re.IGNORECASE)
+        b2_jenis_pph = b2_match.group(1).strip() if b2_match else ""
+
         # --- 2. FINANCIALS ---
         code_match = re.search(r"(\d{2}-\d{3}-\d{2})", text)
         kode_objek = code_match.group(1) if code_match else ""
@@ -259,23 +276,54 @@ def process_pdf_content(text, filename, index):
             no_dokumen = clean_doc.replace("\n", " ").strip()
             no_dokumen = re.sub(r"\s+", " ", no_dokumen)
 
+        # --- B.8: JENIS DOKUMEN & TANGGAL DOKUMEN ---
+        jenis_dokumen = ""
+        tanggal_dokumen = ""
+        b8_match = re.search(r"(?:Jenis\s+Dokumen|B\.8.*?Jenis\s+Dokumen)\s*[:\s]*([^\n]+)", text, re.IGNORECASE)
+        if b8_match:
+            b8_text = b8_match.group(1).strip()
+            tgl_split = re.split(r"Tanggal\s*[:\s]", b8_text, flags=re.IGNORECASE)
+            jenis_dokumen = tgl_split[0].strip().rstrip(':').strip()
+            if len(tgl_split) > 1:
+                tanggal_dokumen = parse_date(tgl_split[1].strip())
+            else:
+                tgl_dok_match = re.search(r"Tanggal\s*[:\s]*([^\n]+)", text[b8_match.end():b8_match.end()+200], re.IGNORECASE)
+                if tgl_dok_match:
+                    tanggal_dokumen = parse_date(tgl_dok_match.group(1).strip())
+
+        # --- B.11: NOMOR SP2D ---
+        nomor_sp2d = ""
+        sp2d_match = re.search(r"(?:B\.11|Nomor\s+SP2D)\s*[:\s]*([^\n]+)", text, re.IGNORECASE)
+        if sp2d_match:
+            nomor_sp2d = sp2d_match.group(1).strip()
+            if re.match(r"^(C\.|IDENTITAS|NPWP)", nomor_sp2d, re.IGNORECASE):
+                nomor_sp2d = ""
+
         extracted_data.append({
             "NO": index,
             "NOMOR": nomor,
             "MASA PAJAK": masa_pajak,
             "SIFAT PEMOTONGAN DAN/ATAU PEMUNGUTAN PPh": "TIDAK FINAL",
             "STATUS BUKTI PEMOTONGAN / PEMUNGUTAN": status_bupot,
+            "A.1 NPWP / NIK": a1_npwp,
+            "A.2 NAMA": a2_nama,
+            "A.3 NITKU": a3_nitku,
+            "B.1 JENIS FASILITAS": b1_fasilitas,
+            "B.2 JENIS PPh": b2_jenis_pph,
             "KODE OBJEK PAJAK": kode_objek,
             "OBJEK PAJAK": objek_pajak,
             "DPP": dpp,
             "TARIF": tarif,
             "PAJAK PENGHASILAN": pph,
+            "B.8 JENIS DOKUMEN": jenis_dokumen,
+            "B.8 TANGGAL DOKUMEN": tanggal_dokumen,
             "NOMOR DOKUMEN": no_dokumen,
-            "NPWP / NIK": npwp,
-            "(NITKU)": nitku,
-            "NAMA PEMOTONG": nama_pemotong,
-            "DATE": date_final,
-            "NAMA PENANDATANGAN": ttd
+            "B.11 NOMOR SP2D": nomor_sp2d,
+            "C.1 NPWP / NIK": npwp,
+            "C.2 NITKU": nitku,
+            "C.3 NAMA PEMOTONG": nama_pemotong,
+            "C.4 TANGGAL": date_final,
+            "C.5 NAMA PENANDATANGAN": ttd
         })
 
         return f"Processed: {filename}"
@@ -290,15 +338,22 @@ def generate_excel():
     df = pd.DataFrame(extracted_data)
     cols = [
         "NO", "NOMOR", "MASA PAJAK", "SIFAT PEMOTONGAN DAN/ATAU PEMUNGUTAN PPh",
-        "STATUS BUKTI PEMOTONGAN / PEMUNGUTAN", "KODE OBJEK PAJAK", "OBJEK PAJAK",
-        "DPP", "TARIF", "PAJAK PENGHASILAN", "NOMOR DOKUMEN", "NPWP / NIK",
-        "(NITKU)", "NAMA PEMOTONG", "DATE", "NAMA PENANDATANGAN"
+        "STATUS BUKTI PEMOTONGAN / PEMUNGUTAN",
+        "A.1 NPWP / NIK", "A.2 NAMA", "A.3 NITKU",
+        "B.1 JENIS FASILITAS", "B.2 JENIS PPh",
+        "KODE OBJEK PAJAK", "OBJEK PAJAK",
+        "DPP", "TARIF", "PAJAK PENGHASILAN",
+        "B.8 JENIS DOKUMEN", "B.8 TANGGAL DOKUMEN",
+        "NOMOR DOKUMEN", "B.11 NOMOR SP2D",
+        "C.1 NPWP / NIK", "C.2 NITKU",
+        "C.3 NAMA PEMOTONG", "C.4 TANGGAL", "C.5 NAMA PENANDATANGAN"
     ]
     for c in cols:
         if c not in df.columns:
             df[c] = ""
 
-    str_cols = ["NOMOR", "NPWP / NIK", "(NITKU)", "NOMOR DOKUMEN"]
+    str_cols = ["NOMOR", "A.1 NPWP / NIK", "A.3 NITKU", "NOMOR DOKUMEN",
+                "C.1 NPWP / NIK", "C.2 NITKU", "B.11 NOMOR SP2D"]
     for c in str_cols:
         df[c] = df[c].astype(str)
 
@@ -311,10 +366,14 @@ def generate_excel():
         num_fmt = workbook.add_format({"num_format": "#,##0"})
         text_fmt = workbook.add_format({"num_format": "@"})
 
-        worksheet.set_column(7, 7, 20, num_fmt)   # DPP
-        worksheet.set_column(9, 9, 20, num_fmt)   # PAJAK PENGHASILAN
-        worksheet.set_column(11, 12, 25, text_fmt) # NPWP/NITKU
-        worksheet.set_column(10, 10, 50, text_fmt) # NOMOR DOKUMEN
+        # Column indices (0-based): DPP=12, PPH=14
+        worksheet.set_column(12, 12, 20, num_fmt)   # DPP
+        worksheet.set_column(14, 14, 20, num_fmt)   # PAJAK PENGHASILAN
+        worksheet.set_column(5, 5, 20, text_fmt)     # A.1 NPWP
+        worksheet.set_column(7, 7, 25, text_fmt)     # A.3 NITKU
+        worksheet.set_column(17, 17, 50, text_fmt)   # NOMOR DOKUMEN
+        worksheet.set_column(18, 18, 20, text_fmt)   # B.11 NOMOR SP2D
+        worksheet.set_column(19, 20, 25, text_fmt)   # C.1 NPWP / C.2 NITKU
 
     return base64.b64encode(buffer.getvalue()).decode()
 
