@@ -310,20 +310,20 @@ def process_pdf_content(text, filename, index):
 
         extracted_data.append({
             "NO": index,
-            "NOMOR": nomor,
-            "MASA PAJAK": masa_pajak,
-            "SIFAT PEMOTONGAN DAN/ATAU PEMUNGUTAN PPh": "TIDAK FINAL",
-            "STATUS BUKTI PEMOTONGAN / PEMUNGUTAN": status_bupot,
+            "H.1 NOMOR": nomor,
+            "H.2 MASA PAJAK": masa_pajak,
+            "H.3 SIFAT PEMOTONGAN DAN/ATAU PEMUNGUTAN PPh": "TIDAK FINAL",
+            "H.4 STATUS BUKTI PEMOTONGAN / PEMUNGUTAN": status_bupot,
             "A.1 NPWP / NIK": a1_npwp,
             "A.2 NAMA": a2_nama,
             "A.3 NITKU": a3_nitku,
             "B.1 JENIS FASILITAS": b1_fasilitas,
             "B.2 JENIS PPh": b2_jenis_pph,
-            "KODE OBJEK PAJAK": kode_objek,
-            "OBJEK PAJAK": objek_pajak,
-            "DPP": dpp,
-            "TARIF": tarif,
-            "PAJAK PENGHASILAN": pph,
+            "B.3 KODE OBJEK PAJAK": kode_objek,
+            "B.4 OBJEK PAJAK": objek_pajak,
+            "B.5 DPP": dpp,
+            "B.6 TARIF": tarif,
+            "B.7 PAJAK PENGHASILAN": pph,
             "B.8 JENIS DOKUMEN": jenis_dokumen,
             "B.8 TANGGAL DOKUMEN": tanggal_dokumen,
             "B.9 NOMOR DOKUMEN": no_dokumen,
@@ -347,12 +347,13 @@ def generate_excel():
 
     df = pd.DataFrame(extracted_data)
     cols = [
-        "NO", "NOMOR", "MASA PAJAK", "SIFAT PEMOTONGAN DAN/ATAU PEMUNGUTAN PPh",
-        "STATUS BUKTI PEMOTONGAN / PEMUNGUTAN",
+        "NO", "H.1 NOMOR", "H.2 MASA PAJAK",
+        "H.3 SIFAT PEMOTONGAN DAN/ATAU PEMUNGUTAN PPh",
+        "H.4 STATUS BUKTI PEMOTONGAN / PEMUNGUTAN",
         "A.1 NPWP / NIK", "A.2 NAMA", "A.3 NITKU",
         "B.1 JENIS FASILITAS", "B.2 JENIS PPh",
-        "KODE OBJEK PAJAK", "OBJEK PAJAK",
-        "DPP", "TARIF", "PAJAK PENGHASILAN",
+        "B.3 KODE OBJEK PAJAK", "B.4 OBJEK PAJAK",
+        "B.5 DPP", "B.6 TARIF", "B.7 PAJAK PENGHASILAN",
         "B.8 JENIS DOKUMEN", "B.8 TANGGAL DOKUMEN",
         "B.9 NOMOR DOKUMEN", "B.10 PEMBAYARAN PPH", "B.11 NOMOR SP2D",
         "C.1 NPWP / NIK", "C.2 NITKU",
@@ -362,7 +363,7 @@ def generate_excel():
         if c not in df.columns:
             df[c] = ""
 
-    str_cols = ["NOMOR", "A.1 NPWP / NIK", "A.3 NITKU", "B.9 NOMOR DOKUMEN",
+    str_cols = ["H.1 NOMOR", "A.1 NPWP / NIK", "A.3 NITKU", "B.9 NOMOR DOKUMEN",
                 "C.1 NPWP / NIK", "C.2 NITKU", "B.11 NOMOR SP2D"]
     for c in str_cols:
         df[c] = df[c].astype(str)
