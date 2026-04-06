@@ -291,33 +291,43 @@ def process_pdf_content(text, filename, index):
                 if tgl_dok_match:
                     tanggal_dokumen = parse_date(tgl_dok_match.group(1).strip())
 
+        # --- B.10: PEMBAYARAN PPH INSTANSI PEMERINTAH ---
+        b10_value = ""
+        b10_match = re.search(r"B\.10.*?(?:Menggunakan|Pemerintah)\s*[:\s]*([^\n]+)", text, re.IGNORECASE)
+        if b10_match:
+            b10_value = b10_match.group(1).strip()
+            if re.match(r"^(B\.11|Nomor\s+SP2D|C\.|IDENTITAS)", b10_value, re.IGNORECASE):
+                b10_value = ""
+
         # --- B.11: NOMOR SP2D ---
         nomor_sp2d = ""
-        sp2d_match = re.search(r"(?:B\.11|Nomor\s+SP2D)\s*[:\s]*([^\n]+)", text, re.IGNORECASE)
+        sp2d_match = re.search(r"B\.11\s*(?:Nomor\s+SP2D)?\s*[:\s]*([^\n]*)", text, re.IGNORECASE)
         if sp2d_match:
             nomor_sp2d = sp2d_match.group(1).strip()
-            if re.match(r"^(C\.|IDENTITAS|NPWP)", nomor_sp2d, re.IGNORECASE):
+            nomor_sp2d = re.sub(r"^Nomor\s+SP2D\s*[:\s]*", "", nomor_sp2d, flags=re.IGNORECASE).strip()
+            if re.match(r"^(C\.|IDENTITAS|NPWP|$)", nomor_sp2d, re.IGNORECASE) or not nomor_sp2d:
                 nomor_sp2d = ""
 
         extracted_data.append({
             "NO": index,
-            "NOMOR": nomor,
-            "MASA PAJAK": masa_pajak,
-            "SIFAT PEMOTONGAN DAN/ATAU PEMUNGUTAN PPh": "TIDAK FINAL",
-            "STATUS BUKTI PEMOTONGAN / PEMUNGUTAN": status_bupot,
+            "H.1 NOMOR": nomor,
+            "H.2 MASA PAJAK": masa_pajak,
+            "H.3 SIFAT PEMOTONGAN DAN/ATAU PEMUNGUTAN PPh": "TIDAK FINAL",
+            "H.4 STATUS BUKTI PEMOTONGAN / PEMUNGUTAN": status_bupot,
             "A.1 NPWP / NIK": a1_npwp,
             "A.2 NAMA": a2_nama,
             "A.3 NITKU": a3_nitku,
             "B.1 JENIS FASILITAS": b1_fasilitas,
             "B.2 JENIS PPh": b2_jenis_pph,
-            "KODE OBJEK PAJAK": kode_objek,
-            "OBJEK PAJAK": objek_pajak,
-            "DPP": dpp,
-            "TARIF": tarif,
-            "PAJAK PENGHASILAN": pph,
+            "B.3 KODE OBJEK PAJAK": kode_objek,
+            "B.4 OBJEK PAJAK": objek_pajak,
+            "B.5 DPP": dpp,
+            "B.6 TARIF": tarif,
+            "B.7 PAJAK PENGHASILAN": pph,
             "B.8 JENIS DOKUMEN": jenis_dokumen,
             "B.8 TANGGAL DOKUMEN": tanggal_dokumen,
-            "NOMOR DOKUMEN": no_dokumen,
+            "B.9 NOMOR DOKUMEN": no_dokumen,
+            "B.10 PEMBAYARAN PPH": b10_value,
             "B.11 NOMOR SP2D": nomor_sp2d,
             "C.1 NPWP / NIK": npwp,
             "C.2 NITKU": nitku,
@@ -337,14 +347,15 @@ def generate_excel():
 
     df = pd.DataFrame(extracted_data)
     cols = [
-        "NO", "NOMOR", "MASA PAJAK", "SIFAT PEMOTONGAN DAN/ATAU PEMUNGUTAN PPh",
-        "STATUS BUKTI PEMOTONGAN / PEMUNGUTAN",
+        "NO", "H.1 NOMOR", "H.2 MASA PAJAK",
+        "H.3 SIFAT PEMOTONGAN DAN/ATAU PEMUNGUTAN PPh",
+        "H.4 STATUS BUKTI PEMOTONGAN / PEMUNGUTAN",
         "A.1 NPWP / NIK", "A.2 NAMA", "A.3 NITKU",
         "B.1 JENIS FASILITAS", "B.2 JENIS PPh",
-        "KODE OBJEK PAJAK", "OBJEK PAJAK",
-        "DPP", "TARIF", "PAJAK PENGHASILAN",
+        "B.3 KODE OBJEK PAJAK", "B.4 OBJEK PAJAK",
+        "B.5 DPP", "B.6 TARIF", "B.7 PAJAK PENGHASILAN",
         "B.8 JENIS DOKUMEN", "B.8 TANGGAL DOKUMEN",
-        "NOMOR DOKUMEN", "B.11 NOMOR SP2D",
+        "B.9 NOMOR DOKUMEN", "B.10 PEMBAYARAN PPH", "B.11 NOMOR SP2D",
         "C.1 NPWP / NIK", "C.2 NITKU",
         "C.3 NAMA PEMOTONG", "C.4 TANGGAL", "C.5 NAMA PENANDATANGAN"
     ]
@@ -352,7 +363,7 @@ def generate_excel():
         if c not in df.columns:
             df[c] = ""
 
-    str_cols = ["NOMOR", "A.1 NPWP / NIK", "A.3 NITKU", "NOMOR DOKUMEN",
+    str_cols = ["H.1 NOMOR", "A.1 NPWP / NIK", "A.3 NITKU", "B.9 NOMOR DOKUMEN",
                 "C.1 NPWP / NIK", "C.2 NITKU", "B.11 NOMOR SP2D"]
     for c in str_cols:
         df[c] = df[c].astype(str)
@@ -371,9 +382,9 @@ def generate_excel():
         worksheet.set_column(14, 14, 20, num_fmt)   # PAJAK PENGHASILAN
         worksheet.set_column(5, 5, 20, text_fmt)     # A.1 NPWP
         worksheet.set_column(7, 7, 25, text_fmt)     # A.3 NITKU
-        worksheet.set_column(17, 17, 50, text_fmt)   # NOMOR DOKUMEN
-        worksheet.set_column(18, 18, 20, text_fmt)   # B.11 NOMOR SP2D
-        worksheet.set_column(19, 20, 25, text_fmt)   # C.1 NPWP / C.2 NITKU
+        worksheet.set_column(17, 17, 50, text_fmt)   # B.9 NOMOR DOKUMEN
+        worksheet.set_column(19, 19, 20, text_fmt)   # B.11 NOMOR SP2D
+        worksheet.set_column(20, 21, 25, text_fmt)   # C.1 NPWP / C.2 NITKU
 
     return base64.b64encode(buffer.getvalue()).decode()
 
